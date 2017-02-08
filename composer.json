@@ -1,0 +1,17 @@
+{
+    "name": "ivorobioff/australia",
+    "authors": [
+        {
+            "name": "ivorobioff",
+            "email": "igor.vorobioff@gmail.com"
+        }
+    ],
+    "require": {
+        "guzzlehttp/guzzle": "^6.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "ImmediateSolutions\\": "./"
+        }
+    }
+}
