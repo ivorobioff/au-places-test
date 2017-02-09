@@ -7,6 +7,7 @@ use RuntimeException;
 class Locator
 {
     const USERNAME = 'ivorobiov';
+    const MAX_ROWS = 500;
 
     /**
      * @param string $location
@@ -22,7 +23,7 @@ class Locator
             'radius' => $distance,
             'username' => self::USERNAME,
             'style' => 'long',
-            'maxRows' => 100
+            'maxRows' => self::MAX_ROWS
         ];
 
         if (is_numeric($location)){
@@ -45,12 +46,14 @@ class Locator
             throw new RuntimeException($data['status']['message'] ?? 'Unknown JSON is given');
         }
 
-        return array_map(function($item){
+        return array_map(function(array $item){
             return [
                 'name' => $item['placeName'],
                 'code' => $item['postalCode']
             ];
-        }, $data['postalCodes']);
+        }, array_filter($data['postalCodes'], function(array $item){
+            return $item['postalCode'] < 1000 || $item['postalCode'] >= 2000;
+        }));
     }
 }
 
