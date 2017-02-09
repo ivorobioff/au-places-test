@@ -17,7 +17,10 @@
             require_once __DIR__.'/vendor/autoload.php';
 
             try {
-                $places = (new ImmediateSolutions\Locator())->places($_POST['location'], $_POST['distance']);
+
+                $pdo = new PDO('mysql:dbname=au_postalcodes;host=127.0.0.1', 'root', '1234');
+
+                $places = (new ImmediateSolutions\Locator($pdo))->places($_POST['location'], $_POST['distance']);
 
                 foreach ($places as $place){
                     echo '<p>'.$place['name'].' ('.$place['code'].')</p>';

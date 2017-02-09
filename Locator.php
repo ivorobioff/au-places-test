@@ -1,13 +1,23 @@
 <?php
 namespace ImmediateSolutions;
-
-use GuzzleHttp\Client;
-use RuntimeException;
+use PDO;
 
 class Locator
 {
-    const USERNAME = 'ivorobiov';
-    const MAX_ROWS = 500;
+    const EARTH_RADIUS = 6371.009;
+
+    /**
+     * @var PDO
+     */
+    private $pdo;
+
+    /**
+     * @param PDO $pdo
+     */
+    public function __construct(PDO $pdo)
+    {
+        $this->pdo = $pdo;
+    }
 
     /**
      * @param string $location
@@ -16,44 +26,47 @@ class Locator
      */
     public function places($location, $distance)
     {
-        $client = new Client();
-
-        $query = [
-            'country' => 'AU',
-            'radius' => $distance,
-            'username' => self::USERNAME,
-            'style' => 'long',
-            'maxRows' => self::MAX_ROWS
-        ];
-
         if (is_numeric($location)){
-            $query['postalcode'] = $location;
+            $constraint = 'postcode=?';
         } else {
-            $query['placename'] = $location;
+            $location = strtoupper($location);
+            $constraint = 'suburb=?';
         }
 
-        $response = $client->get('http://api.geonames.org/findNearbyPostalCodesJSON', ['query' => $query]);
 
-        $json = (string) $response->getBody();
+        $stm = $this->pdo->prepare('SELECT * FROM postcode_db WHERE '.$constraint);
+        $stm->execute([$location]);
+        $data = $stm->fetch(PDO::FETCH_ASSOC);
 
-        $data = json_decode($json, true);
-
-        if ($data === null){
-            throw new RuntimeException('JSON is expected but something else is given');
+        if (!$data){
+            return [];
         }
 
-        if (!isset($data['postalCodes'])){
-            throw new RuntimeException($data['status']['message'] ?? 'Unknown JSON is given');
+        $lat = (float) $data['lat'];
+        $lng = (float) $data['lon'];
+
+        $maxLat = (float) $lat + rad2deg($distance / self::EARTH_RADIUS);
+        $minLat = (float) $lat - rad2deg($distance / self::EARTH_RADIUS);
+
+        $maxLng = (float) $lng + rad2deg($distance / self::EARTH_RADIUS / cos(deg2rad((float) $lat)));
+        $minLng = (float) $lng - rad2deg($distance / self::EARTH_RADIUS / cos(deg2rad((float) $lat)));
+
+
+        $stm = $this->pdo->prepare('SELECT * FROM postcode_db WHERE lat > ? AND lat < ? AND lon > ? AND lon < ? ORDER BY ABS(lat - ?) + ABS(lon - ?) ASC');
+        $stm->execute([$minLat, $maxLat, $minLng, $maxLng, $lat, $lng]);
+
+        $result = [];
+
+        while ($item = $stm->fetch(PDO::FETCH_ASSOC)){
+            if ($item['postcode'] < 1000 || $item['postcode'] >= 2000){
+                $result[] = [
+                    'name' => $item['suburb'],
+                    'code' => $item['postcode']
+                ];
+            }
         }
 
-        return array_map(function(array $item){
-            return [
-                'name' => $item['placeName'],
-                'code' => $item['postalCode']
-            ];
-        }, array_filter($data['postalCodes'], function(array $item){
-            return $item['postalCode'] < 1000 || $item['postalCode'] >= 2000;
-        }));
+        return $result;
     }
 }
 
